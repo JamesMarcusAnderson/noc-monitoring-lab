@@ -1,0 +1,58 @@
+# Prometheus scrape configuration for the NOC monitoring lab.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Alerting rules evaluated by Prometheus; see alerts.yml.
+rule_files:
+  - "/etc/prometheus/alerts.yml"
+
+scrape_configs:
+  # Prometheus monitors itself (control: the monitoring pipeline is up).
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Host availability + interface status + bandwidth via node_exporter.
+  # up==0 on this job fires the InstanceDown alert.
+  - job_name: "node"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels:
+          role: "lab-host"
+
+  # Latency probes (ICMP ping) against lab-local targets via blackbox_exporter.
+  # Replace the example targets with your own lab hosts. These are
+  # documentation placeholders, not live infrastructure.
+  - job_name: "blackbox-icmp"
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    static_configs:
+      - targets:
+          - lab-gateway
+          - lab-switch-01
+          - lab-dns-01
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # HTTP availability probes (interface/service status from the user's side).
+  - job_name: "blackbox-http"
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - http://lab-gateway/login
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
