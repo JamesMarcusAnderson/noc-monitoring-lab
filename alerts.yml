@@ -1,0 +1,75 @@
+# Prometheus alerting rules for the NOC monitoring lab.
+# Thresholds are lab starting points, not production values: tune the
+# latency and bandwidth numbers to your own links before trusting them.
+groups:
+  - name: noc-availability
+    interval: 15s
+    rules:
+      # Host down: the exporter stopped answering scrapes.
+      - alert: InstanceDown
+        expr: up{job="node"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Host {{ $labels.instance }} is down"
+          description: >-
+            Prometheus has failed to scrape {{ $labels.instance }} for more than
+            2 minutes. Check power, network path, and whether the exporter
+            process is running.
+
+      # Interface down: node_exporter reports the link as down (ignores loopback).
+      - alert: InterfaceDown
+        expr: node_network_up{device!="lo"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Interface {{ $labels.device }} down on {{ $labels.instance }}"
+          description: >-
+            Interface {{ $labels.device }} on {{ $labels.instance }} reports
+            operstate down. Check cabling, switch port status, and peer device.
+
+  - name: noc-performance
+    interval: 15s
+    rules:
+      # High latency: ICMP probe round-trip time above 200ms for 5 minutes.
+      # Tune 0.2 to what is abnormal for YOUR path; 200ms is a lab default.
+      - alert: HighLatency
+        expr: probe_duration_seconds{job="blackbox-icmp"} > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency to {{ $labels.instance }}"
+          description: >-
+            ICMP probe to {{ $labels.instance }} has exceeded 200ms for 5
+            minutes (current: {{ $value }}s). Look for congestion, routing
+            changes, or an overloaded far end.
+
+      # Failed probes: the target is not answering ping at all.
+      - alert: ProbeFailed
+        expr: probe_success{job="blackbox-icmp"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Ping probe failing for {{ $labels.instance }}"
+          description: >-
+            ICMP probes to {{ $labels.instance }} have failed for 3 minutes.
+            Distinguish host-down (InstanceDown also firing) from a filtering /
+            routing problem (only this alert firing).
+
+      # Bandwidth saturation: sustained receive rate above 800 Mbit/s on a
+      # non-loopback interface. 800 Mbit/s ~= 100 MB/s = 1e8 bytes/s.
+      # Adjust 1e8 to ~80% of the actual link capacity you are watching.
+      - alert: BandwidthSaturation
+        expr: sum by (instance, device) (rate(node_network_receive_bytes_total{device!="lo"}[5m])) > 1e8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Bandwidth saturation on {{ $labels.device }} ({{ $labels.instance }})"
+          description: >-
+            Receive rate on {{ $labels.device }} has exceeded ~800 Mbit/s for
+            10 minutes. Identify top talkers before the link drops packets.
