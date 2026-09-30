@@ -27,6 +27,7 @@ blackbox.yml                    blackbox_exporter probe modules (icmp, http_2xx)
 alerts.yml                      5 alerting rules: availability + performance
 grafana/dashboards/noc-overview.json   "NOC Overview" dashboard (auto-provisioned)
 grafana/provisioning/dashboards/lab.yml  dashboard provisioning config
+grafana/provisioning/datasources/prometheus.yml  Prometheus datasource (auto-provisioned)
 docs/simulated-outage.md        worked incident report (illustrative example)
 scripts/ping-check.sh           independent ping/latency smoke check
 ```
