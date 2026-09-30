@@ -12,7 +12,7 @@ echo "Probing ${TARGET} with ${COUNT} ICMP echo requests..."
 OUT="$(ping -c "${COUNT}" -i 0.5 -W 2 "${TARGET}" 2>&1)" || true
 echo "${OUT}" | tail -n 4
 
-LOSS="$(echo "${OUT}" | grep -oE '[0-9]+% packet loss' | grep -oE '[0-9]+' || echo 100)"
+LOSS="$(echo "${OUT}" | grep -oE '[0-9]+(\.[0-9]+)?% packet loss' | head -n 1 | grep -oE '^[0-9]+' || echo 100)"
 AVG="$(echo "${OUT}" | grep -oE 'min/avg/max[^=]*= [0-9.]+/[0-9.]+' | grep -oE '[0-9.]+/[0-9.]+$' | cut -d/ -f2 || echo '?')"
 echo "loss=${LOSS}% avg_rtt_ms=${AVG}"
 
